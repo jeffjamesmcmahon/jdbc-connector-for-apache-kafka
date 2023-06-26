@@ -20,6 +20,7 @@ package io.aiven.connect.jdbc.sink;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -31,9 +32,14 @@ import io.aiven.connect.jdbc.dialect.DatabaseDialect.StatementBinder;
 import io.aiven.connect.jdbc.sink.metadata.FieldsMetadata;
 import io.aiven.connect.jdbc.sink.metadata.SchemaPair;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static io.aiven.connect.jdbc.sink.JdbcSinkConfig.InsertMode.MULTI;
+import static java.util.Objects.isNull;
 
 public class PreparedStatementBinder implements StatementBinder {
+    private static final Logger log = LoggerFactory.getLogger(PreparedStatementBinder.class);
 
     private final JdbcSinkConfig.PrimaryKeyMode pkMode;
     private final PreparedStatement statement;
@@ -41,6 +47,7 @@ public class PreparedStatementBinder implements StatementBinder {
     private final FieldsMetadata fieldsMetadata;
     private final JdbcSinkConfig.InsertMode insertMode;
     private final DatabaseDialect dialect;
+    private int batchCount;
 
     public PreparedStatementBinder(
             final DatabaseDialect dialect,
@@ -56,6 +63,7 @@ public class PreparedStatementBinder implements StatementBinder {
         this.schemaPair = schemaPair;
         this.fieldsMetadata = fieldsMetadata;
         this.insertMode = insertMode;
+        this.batchCount = 0;
     }
 
     @Override
@@ -67,33 +75,38 @@ public class PreparedStatementBinder implements StatementBinder {
 
     public int bindRecord(int index, final SinkRecord record) throws SQLException {
         final Struct valueStruct = (Struct) record.value();
-
+        final boolean isDelete = isNull(valueStruct);
+        this.batchCount++;
         // Assumption: the relevant SQL has placeholders for keyFieldNames first followed by
         //             nonKeyFieldNames, in iteration order for all INSERT/ UPSERT queries
         //             the relevant SQL has placeholders for nonKeyFieldNames first followed by
         //             keyFieldNames, in iteration order for all UPDATE queries
+        int nextIndex = 1;
+        if (isDelete) {
+            bindKeyFields(record, index);
+        } else {
+            switch (insertMode) {
+                case INSERT:
+                case MULTI:
+                case UPSERT:
+                    index = bindKeyFields(record, index);
+                    nextIndex = bindNonKeyFields(record, valueStruct, index);
+                    break;
 
-        final int nextIndex;
-        switch (insertMode) {
-            case INSERT:
-            case MULTI:
-            case UPSERT:
-                index = bindKeyFields(record, index);
-                nextIndex = bindNonKeyFields(record, valueStruct, index);
-                break;
+                case UPDATE:
+                    index = bindNonKeyFields(record, valueStruct, index);
+                    nextIndex = bindKeyFields(record, index);
+                    break;
+                default:
+                    throw new AssertionError();
 
-            case UPDATE:
-                index = bindNonKeyFields(record, valueStruct, index);
-                nextIndex = bindKeyFields(record, index);
-                break;
-            default:
-                throw new AssertionError();
-
+            }
         }
         // in a multi-row insert, all records are a single item in the batch
         if (insertMode != MULTI) {
             statement.addBatch();
         }
+
         return nextIndex;
     }
 
@@ -153,6 +166,11 @@ public class PreparedStatementBinder implements StatementBinder {
     }
 
     protected void bindField(final int index, final Schema schema, final Object value) throws SQLException {
-        dialect.bindField(statement, index, schema, value);
+        try{
+            dialect.bindField(statement, index, schema, value);
+        }
+        catch (final Exception ex) {
+            log.error(ex.getMessage());
+        }
     }
 }

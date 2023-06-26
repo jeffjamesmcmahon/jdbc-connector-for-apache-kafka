@@ -454,7 +454,7 @@ public abstract class BaseDialectTest<T extends GenericDatabaseDialect> {
             final URL url = Resources.getResource(resourceName);
             final String content = Resources.toString(url, StandardCharsets.UTF_8);
             return content
-                .replace("\n", System.lineSeparator())
+                .replace("\r\n", System.lineSeparator())
                 .replace("|<EOL>", "");
         } catch (final IOException e) {
             throw new RuntimeException(e);

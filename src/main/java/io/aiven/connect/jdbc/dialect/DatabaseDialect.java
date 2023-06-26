@@ -324,6 +324,14 @@ public interface DatabaseDialect extends ConnectionProvider {
         Collection<ColumnId> nonKeyColumns
     );
 
+
+    default String buildDeleteStatement(
+            TableId table,
+            Collection<ColumnId> keyColumns
+    ) {
+        throw new UnsupportedOperationException();
+    }
+
     /**
      * Build an INSERT statement for multiple rows.
      *

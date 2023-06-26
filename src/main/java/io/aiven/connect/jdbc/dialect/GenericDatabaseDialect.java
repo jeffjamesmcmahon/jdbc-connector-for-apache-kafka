@@ -1069,6 +1069,17 @@ public class GenericDatabaseDialect implements DatabaseDialect {
                 statement.executeUpdate(ddlStatement);
             }
         }
+        try {
+            connection.commit();
+        } catch (Exception e) {
+            try {
+                connection.rollback();
+            } catch (SQLException sqle) {
+                e.addSuppressed(sqle);
+            } finally {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -1338,6 +1349,24 @@ public class GenericDatabaseDialect implements DatabaseDialect {
      */
     protected void free(final Clob clob) throws SQLException {
         clob.free();
+    }
+
+    @Override
+    public final String buildDeleteStatement(
+            final TableId table,
+            final Collection<ColumnId> keyColumns
+    ) {
+        final ExpressionBuilder builder = expressionBuilder();
+        builder.append("DELETE FROM ");
+        builder.append(table);
+        if (!keyColumns.isEmpty()) {
+            builder.append(" WHERE ");
+            builder.appendList()
+                    .delimitedBy(" AND ")
+                    .transformedBy(ExpressionBuilder.columnNamesWith(" = ?"))
+                    .of(keyColumns);
+        }
+        return builder.toString();
     }
 
     @Override

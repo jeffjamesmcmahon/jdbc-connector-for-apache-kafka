@@ -89,7 +89,7 @@ public class DatabaseDialects {
                             final DatabaseDialectProvider provider = dialectIterator.next();
                             REGISTRY.put(provider.getClass().getName(), provider);
                             count.incrementAndGet();
-                            LOG.debug("Found '{}' provider {}", provider, provider.getClass());
+                            LOG.info("Found '{}' provider {}", provider, provider.getClass());
                         } catch (final Throwable t) {
                             LOG.debug("Skipping dialect provider after error while loading", t);
                         }

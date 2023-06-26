@@ -68,21 +68,18 @@ public class JdbcSinkTask extends SinkTask {
         if (records.isEmpty()) {
             return;
         }
+        final long startTime = System.currentTimeMillis();
         final SinkRecord first = records.iterator().next();
         final int recordsCount = records.size();
-        log.debug(
-            "Received {} records. First record kafka coordinates:({}-{}-{}). Writing them to the "
-                + "database...",
-            recordsCount, first.topic(), first.kafkaPartition(), first.kafkaOffset()
-        );
         try {
             writer.write(records);
+            final long endTime = System.currentTimeMillis();
+            final long elapsedTime = endTime - startTime;
+            log.info("Wrote {} records in {}ms for {}-{}-{} ",recordsCount, elapsedTime,
+                    first.topic(), first.kafkaPartition(), first.kafkaOffset());
         } catch (final SQLException sqle) {
             log.warn(
-                "Write of {} records failed, remainingRetries={}",
-                records.size(),
-                remainingRetries,
-                sqle
+                "Write of {} records failed, remainingRetries={}", records.size(), remainingRetries, sqle
             );
             String sqleAllMessages = "";
             for (final Throwable e : sqle) {

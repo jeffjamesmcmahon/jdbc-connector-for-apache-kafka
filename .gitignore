@@ -20,5 +20,10 @@ test.sqlite
 *.db-journal
 
 # Gradle
-/build
+/build/
 /.gradle
+/out/
+
+/build.bat
+/dist.bat
+/JdbcSinkTaskTest.db
